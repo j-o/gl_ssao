@@ -56,7 +56,6 @@ namespace ssao
   static const int  NUM_MRT = 8;
   static const int  HBAO_RANDOM_SIZE = 4;
   static const int  HBAO_RANDOM_ELEMENTS = HBAO_RANDOM_SIZE*HBAO_RANDOM_SIZE;
-  static const int  MAX_SAMPLES = 8;
 
   static const int        grid = 32;
   static const float      globalscale = 16.0f;
@@ -76,20 +75,13 @@ namespace ssao
       ProgramManager::ProgramID
         draw_scene,
         depth_linearize,
-        depth_linearize_msaa,
         viewnormal,
-        bilateralblur,
-        displaytex,
 
-        hbao_calc,
-        hbao_calc_blur,
         hbao_blur,
         hbao_blur2,
 
         hbao2_deinterleave,
-        hbao2_calc,
         hbao2_calc_blur,
-        hbao2_reinterleave,
         hbao2_reinterleave_blur;
 
     } programs;
@@ -120,8 +112,6 @@ namespace ssao
         scene_viewnormal,
         hbao_result,
         hbao_blur,
-        hbao_random,
-        hbao_randomview[MAX_SAMPLES],
         hbao2_deptharray,
         hbao2_depthview[HBAO_RANDOM_ELEMENTS],
         hbao2_resultarray;
@@ -144,21 +134,15 @@ namespace ssao
     struct Tweak {
       Tweak()
 
-        : algorithm(ALGORITHM_HBAO_CACHEAWARE)
-        , samples(1)
-        , intensity(1.5f)
+        : intensity(1.5f)
         , radius(2.f)
         , bias(0.1f)
-        , blur(1)
         , blurSharpness(40.0f)
       {}
 
-      int             samples;
-      AlgorithmType   algorithm;
       float           intensity;
       float           bias;
       float           radius;
-      int             blur;
       float           blurSharpness;
     };
 
@@ -167,7 +151,7 @@ namespace ssao
     uint       sceneTriangleIndices;
     uint       sceneObjects;
 
-    vec4f      hbaoRandom[HBAO_RANDOM_ELEMENTS * MAX_SAMPLES];
+    vec4f      hbaoRandom[HBAO_RANDOM_ELEMENTS];
 
     struct Projection {
       float nearplane;
@@ -205,7 +189,7 @@ namespace ssao
     bool initProgram();
     bool initScene();
     bool initMisc();
-    bool initFramebuffers(int width, int height, int samples);
+    bool initFramebuffers(int width, int height);
 
     CameraControl m_control;
 
@@ -249,10 +233,6 @@ namespace ssao
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "viewnormal.frag.glsl"));
 
-    programs.displaytex = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "displaytex.frag.glsl"));
-
     programs.hbao_blur = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_BLUR_PRESENT 0\n","hbao_blur.frag.glsl"));
@@ -286,9 +266,9 @@ namespace ssao
 
     rng.seed((unsigned)0);
 
-    signed short f[HBAO_RANDOM_ELEMENTS*MAX_SAMPLES*4];
+    signed short f[HBAO_RANDOM_ELEMENTS*4];
 
-    for(int i=0; i<HBAO_RANDOM_ELEMENTS*MAX_SAMPLES; i++)
+    for(int i=0; i<HBAO_RANDOM_ELEMENTS; i++)
     {
       float Rand1 = rng.randExc();
       float Rand2 = rng.randExc();
@@ -398,7 +378,7 @@ namespace ssao
     return true;
   }
 
-  bool Sample::initFramebuffers(int width, int height, int samples)
+  bool Sample::initFramebuffers(int width, int height)
   {
     newTexture(textures.scene_color);
     glBindTexture (GL_TEXTURE_2D, textures.scene_color);
@@ -542,7 +522,7 @@ namespace ssao
     validated = validated && initProgram();
     validated = validated && initMisc();
     validated = validated && initScene();
-    validated = validated && initFramebuffers(m_window.m_viewsize[0],m_window.m_viewsize[1],tweak.samples);
+    validated = validated && initFramebuffers(m_window.m_viewsize[0],m_window.m_viewsize[1]);
 
     TwBar *bar = TwNewBar("mainbar");
     TwDefine(" GLOBAL contained=true help='OpenGL samples.\nCopyright NVIDIA Corporation 2013-2014' ");
@@ -772,9 +752,6 @@ namespace ssao
     Projection projection;
     projection.update(width,height);
 
-    if (tweakLast.samples != tweak.samples){
-      initFramebuffers(width,height,tweak.samples);
-    }
     tweakLast = tweak;
 
     {
@@ -845,7 +822,7 @@ namespace ssao
   void Sample::resize(int width, int height)
   {
     TwWindowSize(width,height);
-    initFramebuffers(width,height,tweak.samples);
+    initFramebuffers(width,height);
   }
 }
 
