@@ -14,28 +14,9 @@ struct SceneData {
   mat4  viewProjMatrix;
   mat4  viewMatrix;
   mat4  viewMatrixIT;
-  
+
   uvec2 viewport;
   uvec2 _pad;
-};
-
-struct HBAOData {
-  float   RadiusToScreen;        // radius
-  float   R2;     // 1/radius
-  float   NegInvR2;     // radius * radius
-  float   NDotVBias;
- 
-  vec2    InvFullResolution;
-  vec2    InvQuarterResolution;
-  
-  float   AOMultiplier;
-  float   PowExponent;
-  vec2    _pad0;
-  
-  vec4    projInfo;
-  vec2    projScale;
-  int     projOrtho;
-  int     _pad1;
 };
 
 #ifdef __cplusplus
@@ -50,7 +31,7 @@ struct HBAOData {
   are met:
    * Redistributions of source code must retain the above copyright
      notice, this list of conditions and the following disclaimer.
-   * Neither the name of its contributors may be used to endorse 
+   * Neither the name of its contributors may be used to endorse
      or promote products derived from this software without specific
      prior written permission.
 

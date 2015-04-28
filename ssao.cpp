@@ -100,8 +100,7 @@ namespace ssao
       ResourceGLuint
         scene_vbo,
         scene_ibo,
-        scene_ubo,
-        hbao_ubo;
+        scene_ubo;
     } buffers;
 
     struct {
@@ -169,6 +168,26 @@ namespace ssao
       void update(int width, int height){
         matrix =  nv_math::perspective(fov, float(width)/float(height), nearplane, farplane);
       }
+    };
+
+
+    struct HBAOData {
+      float   RadiusToScreen;        // radius
+      float   R2;     // 1/radius
+      float   NegInvR2;     // radius * radius
+      float   NDotVBias;
+
+      vec2    InvFullResolution;
+      vec2    InvQuarterResolution;
+
+      float   AOMultiplier;
+      float   PowExponent;
+      vec2    _pad0;
+
+      vec4    projInfo;
+      vec2    projScale;
+      int     projOrtho;
+      int     _pad1;
     };
 
     SceneData  sceneUbo;
@@ -285,9 +304,6 @@ namespace ssao
       f[i*4+3] = (signed short)(SCALE*hbaoRandom[i].w);
 #undef SCALE
     }
-
-    newBuffer(buffers.hbao_ubo);
-    glNamedBufferStorageEXT(buffers.hbao_ubo, sizeof(HBAOData), NULL, GL_DYNAMIC_STORAGE_BIT);
 
     return true;
   }
@@ -676,8 +692,17 @@ namespace ssao
       glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_ARRAY, textures.hbao2_deptharray);
       glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.scene_viewnormal);
 
-      glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers.hbao_ubo);
-      glNamedBufferSubDataEXT(buffers.hbao_ubo,0,sizeof(HBAOData),&hbaoUbo);
+      glUniform1f(3, hbaoUbo.RadiusToScreen);
+      glUniform1f(4, hbaoUbo.R2);
+      glUniform1f(5, hbaoUbo.NegInvR2);
+      glUniform1f(6, hbaoUbo.NDotVBias);
+      glUniform2fv(7, 1, hbaoUbo.InvFullResolution.get_value());
+      glUniform2fv(8, 1, hbaoUbo.InvQuarterResolution.get_value());
+      glUniform1f(9, hbaoUbo.AOMultiplier);
+      glUniform1f(10, hbaoUbo.PowExponent);
+      glUniform4fv(11, 1, hbaoUbo.projInfo.get_value());
+      glUniform2fv(12, 1, hbaoUbo.projScale.get_value());
+      glUniform1i(13, hbaoUbo.projOrtho);
 
       for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++){
         glUniform2f(0, float(i % 4) + 0.5f, float(i / 4) + 0.5f);

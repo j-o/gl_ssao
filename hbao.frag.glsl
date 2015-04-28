@@ -43,9 +43,20 @@ const float  NUM_DIRECTIONS = 8; // texRandom/g_Jitter initialization depends on
   layout(binding=1) uniform sampler2D texRandom;
 #endif
 
-layout(std140,binding=0) uniform controlBuffer {
-  HBAOData   control;
-};
+layout(location=3)  uniform float   RadiusToScreen;        // radius
+layout(location=4)  uniform float   R2;     // 1/radius
+layout(location=5)  uniform float   NegInvR2;     // radius * radius
+layout(location=6)  uniform float   NDotVBias;
+
+layout(location=7)  uniform vec2    InvFullResolution;
+layout(location=8)  uniform vec2    InvQuarterResolution;
+
+layout(location=9)  uniform float   AOMultiplier;
+layout(location=10) uniform float   PowExponent;
+
+layout(location=11) uniform vec4    projInfo;
+layout(location=12) uniform vec2    projScale;
+layout(location=13) uniform int     projOrtho;
 
 layout(location=0,index=0) out vec4 out_Color;
 
@@ -55,7 +66,7 @@ in vec2 texCoord;
 
 vec3 UVToView(vec2 uv, float eye_z)
 {
-  return vec3((uv * control.projInfo.xy + control.projInfo.zw) * (control.projOrtho != 0 ? 1. : eye_z), eye_z);
+  return vec3((uv * projInfo.xy + projInfo.zw) * (projOrtho != 0 ? 1. : eye_z), eye_z);
 }
 
 #if AO_DEINTERLEAVED
@@ -83,10 +94,10 @@ vec3 MinDiff(vec3 P, vec3 Pr, vec3 Pl)
 
 vec3 ReconstructNormal(vec2 UV, vec3 P)
 {
-  vec3 Pr = FetchViewPos(UV + vec2(control.InvFullResolution.x, 0));
-  vec3 Pl = FetchViewPos(UV + vec2(-control.InvFullResolution.x, 0));
-  vec3 Pt = FetchViewPos(UV + vec2(0, control.InvFullResolution.y));
-  vec3 Pb = FetchViewPos(UV + vec2(0, -control.InvFullResolution.y));
+  vec3 Pr = FetchViewPos(UV + vec2(InvFullResolution.x, 0));
+  vec3 Pl = FetchViewPos(UV + vec2(-InvFullResolution.x, 0));
+  vec3 Pt = FetchViewPos(UV + vec2(0, InvFullResolution.y));
+  vec3 Pb = FetchViewPos(UV + vec2(0, -InvFullResolution.y));
   return normalize(cross(MinDiff(P, Pr, Pl), MinDiff(P, Pt, Pb)));
 }
 
@@ -96,7 +107,7 @@ vec3 ReconstructNormal(vec2 UV, vec3 P)
 float Falloff(float DistanceSquare)
 {
   // 1 scalar mad instruction
-  return DistanceSquare * control.NegInvR2 + 1.0;
+  return DistanceSquare * NegInvR2 + 1.0;
 }
 
 //----------------------------------------------------------------------------------
@@ -111,7 +122,7 @@ float ComputeAO(vec3 P, vec3 N, vec3 S)
   float NdotV = dot(N, V) * 1.0/sqrt(VdotV);
 
   // Use saturate(x) instead of max(x,0.f) because that is faster on Kepler
-  return clamp(NdotV - control.NDotVBias,0,1) * clamp(Falloff(VdotV),0,1);
+  return clamp(NdotV - NDotVBias,0,1) * clamp(Falloff(VdotV),0,1);
 }
 
 //----------------------------------------------------------------------------------
@@ -159,10 +170,10 @@ float ComputeCoarseAO(vec2 FullResUV, float RadiusPixels, vec4 Rand, vec3 ViewPo
     for (float StepIndex = 0; StepIndex < NUM_STEPS; ++StepIndex)
     {
 #if AO_DEINTERLEAVED
-      vec2 SnappedUV = round(RayPixels * Direction) * control.InvQuarterResolution + FullResUV;
+      vec2 SnappedUV = round(RayPixels * Direction) * InvQuarterResolution + FullResUV;
       vec3 S = FetchQuarterResViewPos(SnappedUV);
 #else
-      vec2 SnappedUV = round(RayPixels * Direction) * control.InvFullResolution + FullResUV;
+      vec2 SnappedUV = round(RayPixels * Direction) * InvFullResolution + FullResUV;
       vec3 S = FetchViewPos(SnappedUV);
 #endif
 
@@ -172,7 +183,7 @@ float ComputeCoarseAO(vec2 FullResUV, float RadiusPixels, vec4 Rand, vec3 ViewPo
     }
   }
 
-  AO *= control.AOMultiplier / (NUM_DIRECTIONS * NUM_STEPS);
+  AO *= AOMultiplier / (NUM_DIRECTIONS * NUM_STEPS);
   return clamp(1.0 - AO * 2.0,0,1);
 }
 
@@ -182,7 +193,7 @@ void main()
   
 #if AO_DEINTERLEAVED
   vec2 base = floor(gl_FragCoord.xy) * 4.0 + g_Float2Offset;
-  vec2 uv = base * (control.InvQuarterResolution / 4.0);
+  vec2 uv = base * (InvQuarterResolution / 4.0);
 
   vec3 ViewPosition = FetchQuarterResViewPos(uv);
   vec4 NormalAndAO =  texelFetch( texViewNormal, ivec2(base), 0);
@@ -195,8 +206,8 @@ void main()
   vec3 ViewNormal = -ReconstructNormal(uv, ViewPosition);
 #endif
 
-  // Compute projection of disk of radius control.R into screen space
-  float RadiusPixels = control.RadiusToScreen / (control.projOrtho != 0 ? 1.0 : ViewPosition.z);
+  // Compute projection of disk of radius R into screen space
+  float RadiusPixels = RadiusToScreen / (projOrtho != 0 ? 1.0 : ViewPosition.z);
 
   // Get jitter vector for the current full-res pixel
   vec4 Rand = GetJitter();
@@ -204,9 +215,9 @@ void main()
   float AO = ComputeCoarseAO(uv, RadiusPixels, Rand, ViewPosition, ViewNormal);
 
 #if AO_BLUR
-  out_Color = vec4(pow(AO, control.PowExponent), ViewPosition.z, 0, 0);
+  out_Color = vec4(pow(AO, PowExponent), ViewPosition.z, 0, 0);
 #else
-  out_Color = vec4(pow(AO, control.PowExponent));
+  out_Color = vec4(pow(AO, PowExponent));
 #endif
   
 }
