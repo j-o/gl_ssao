@@ -113,7 +113,6 @@ namespace ssao
         hbao_result,
         hbao_blur,
         hbao2_deptharray,
-        hbao2_depthview[HBAO_RANDOM_ELEMENTS],
         hbao2_resultarray;
     } textures;
 
@@ -466,17 +465,6 @@ namespace ssao
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glBindTexture (GL_TEXTURE_2D_ARRAY, 0);
 
-    for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++){
-      newTexture(textures.hbao2_depthview[i]);
-      glTextureView(textures.hbao2_depthview[i], GL_TEXTURE_2D, textures.hbao2_deptharray, GL_R32F, 0, 1, i, 1);
-      glBindTexture(GL_TEXTURE_2D, textures.hbao2_depthview[i]);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
 
     newTexture(textures.hbao2_resultarray);
     glBindTexture (GL_TEXTURE_2D_ARRAY, textures.hbao2_resultarray);
@@ -672,8 +660,7 @@ namespace ssao
         glUniform4f(0, float(i % 4) + 0.5f, float(i / 4) + 0.5f, hbaoUbo.InvFullResolution.x, hbaoUbo.InvFullResolution.y);
 
         for (int layer = 0; layer < NUM_MRT; layer++){
-          //glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_depthview[i+layer], 0);
-            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_deptharray, 0, i + layer);
+          glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_deptharray, 0, i + layer);
         }
         glDrawArrays(GL_TRIANGLES,0,3);
       }
@@ -686,6 +673,7 @@ namespace ssao
       glViewport(0,0,quarterWidth,quarterHeight);
 
       glUseProgram(progManager.get(programs.hbao2_calc_blur));
+      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_ARRAY, textures.hbao2_deptharray);
       glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.scene_viewnormal);
 
       glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers.hbao_ubo);
@@ -694,8 +682,8 @@ namespace ssao
       for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++){
         glUniform2f(0, float(i % 4) + 0.5f, float(i / 4) + 0.5f);
         glUniform4fv(1, 1, hbaoRandom[i].get_value());
+        glUniform1f(2, static_cast<float>(i));
 
-        glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, textures.hbao2_depthview[i]);
         glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textures.hbao2_resultarray, 0, i);
 
         glDrawArrays(GL_TRIANGLES,0,3);

@@ -35,7 +35,8 @@ const float  NUM_DIRECTIONS = 8; // texRandom/g_Jitter initialization depends on
 #if AO_DEINTERLEAVED
   layout(location=0) uniform vec2 g_Float2Offset;
   layout(location=1) uniform vec4 g_Jitter;
-  layout(binding=0) uniform sampler2D texLinearDepth;
+  layout(location=2) uniform float g_depthLayer;
+  layout(binding=0) uniform sampler2DArray texArrayLinearDepth;
   layout(binding=1) uniform sampler2D texViewNormal;
 #else
   layout(binding=0) uniform sampler2D texLinearDepth;
@@ -61,7 +62,7 @@ vec3 UVToView(vec2 uv, float eye_z)
 
 vec3 FetchQuarterResViewPos(vec2 UV)
 {
-  float ViewDepth = textureLod(texLinearDepth,UV,0).x;
+  float ViewDepth = textureLod(texArrayLinearDepth,vec3(UV, g_depthLayer),0).x;
   return UVToView(UV, ViewDepth);
 }
 
