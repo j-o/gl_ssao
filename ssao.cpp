@@ -6,7 +6,7 @@
   are met:
    * Redistributions of source code must retain the above copyright
      notice, this list of conditions and the following disclaimer.
-   * Neither the name of its contributors may be used to endorse 
+   * Neither the name of its contributors may be used to endorse
      or promote products derived from this software without specific
      prior written permission.
 
@@ -39,8 +39,6 @@
 #include <nv_helpers/cameracontrol.hpp>
 
 #include <noise/MersenneTwister.h>
-
-#define USE_AO_SPECIALBLUR 1
 
 
 using namespace nv_helpers;
@@ -107,7 +105,7 @@ namespace ssao
     } fbos;
 
     struct {
-      ResourceGLuint  
+      ResourceGLuint
         scene_vbo,
         scene_ibo,
         scene_ubo,
@@ -144,7 +142,7 @@ namespace ssao
 
 
     struct Tweak {
-      Tweak() 
+      Tweak()
 
         : algorithm(ALGORITHM_HBAO_CACHEAWARE)
         , samples(1)
@@ -216,18 +214,18 @@ namespace ssao
     }
     // return true to prevent m_window updates
     bool mouse_pos    (int x, int y) {
-      return !!TwEventMousePosGLFW(x,y); 
+      return !!TwEventMousePosGLFW(x,y);
     }
     bool mouse_button (int button, int action) {
       return !!TwEventMouseButtonGLFW(button, action);
     }
     bool mouse_wheel  (int wheel) {
-      return !!TwEventMouseWheelGLFW(wheel); 
+      return !!TwEventMouseWheelGLFW(wheel);
     }
     bool key_button   (int button, int action, int mods) {
       return handleTwKeyPressed(button,action,mods);
     }
-    
+
   };
 
   bool Sample::initProgram()
@@ -243,17 +241,9 @@ namespace ssao
       ProgramManager::Definition(GL_VERTEX_SHADER,          "scene.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "scene.frag.glsl"));
 
-    programs.bilateralblur = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "bilateralblur.frag.glsl"));
-
     programs.depth_linearize = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define DEPTHLINEARIZE_MSAA 0\n", "depthlinearize.frag.glsl"));
-
-    programs.depth_linearize_msaa = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define DEPTHLINEARIZE_MSAA 1\n", "depthlinearize.frag.glsl"));
 
     programs.viewnormal = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
@@ -263,14 +253,6 @@ namespace ssao
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "displaytex.frag.glsl"));
 
-    programs.hbao_calc = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_DEINTERLEAVED 0\n#define AO_BLUR 0\n", "hbao.frag.glsl"));
-
-    programs.hbao_calc_blur = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_DEINTERLEAVED 0\n#define AO_BLUR 1\n", "hbao.frag.glsl"));
-
     programs.hbao_blur = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_BLUR_PRESENT 0\n","hbao_blur.frag.glsl"));
@@ -279,10 +261,6 @@ namespace ssao
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_BLUR_PRESENT 1\n","hbao_blur.frag.glsl"));
 
-    programs.hbao2_calc = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_DEINTERLEAVED 1\n#define AO_BLUR 0\n", "hbao.frag.glsl"));
-
     programs.hbao2_calc_blur = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_DEINTERLEAVED 1\n#define AO_BLUR 1\n", "hbao.frag.glsl"));
@@ -290,10 +268,6 @@ namespace ssao
     programs.hbao2_deinterleave = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
       ProgramManager::Definition(GL_FRAGMENT_SHADER,        "hbao_deinterleave.frag.glsl"));
-
-    programs.hbao2_reinterleave = progManager.createProgram(
-      ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
-      ProgramManager::Definition(GL_FRAGMENT_SHADER,        "#define AO_BLUR 0\n","hbao_reinterleave.frag.glsl"));
 
     programs.hbao2_reinterleave_blur = progManager.createProgram(
       ProgramManager::Definition(GL_VERTEX_SHADER,          "fullscreenquad.vert.glsl"),
@@ -333,24 +307,6 @@ namespace ssao
 #undef SCALE
     }
 
-    newTexture(textures.hbao_random);
-    glBindTexture(GL_TEXTURE_2D_ARRAY,textures.hbao_random);
-    glTexStorage3D (GL_TEXTURE_2D_ARRAY,1,GL_RGBA16_SNORM,HBAO_RANDOM_SIZE,HBAO_RANDOM_SIZE,MAX_SAMPLES);
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,0, HBAO_RANDOM_SIZE,HBAO_RANDOM_SIZE,MAX_SAMPLES,GL_RGBA,GL_SHORT,f);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
-    glBindTexture(GL_TEXTURE_2D_ARRAY,0);
-
-    for (int i = 0; i < MAX_SAMPLES; i++)
-    {
-      newTexture(textures.hbao_randomview[i]);
-      glTextureView(textures.hbao_randomview[i], GL_TEXTURE_2D, textures.hbao_random, GL_RGBA16_SNORM, 0, 1, i, 1);
-      glBindTexture(GL_TEXTURE_2D, textures.hbao_randomview[i]);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
     newBuffer(buffers.hbao_ubo);
     glNamedBufferStorageEXT(buffers.hbao_ubo, sizeof(HBAOData), NULL, GL_DYNAMIC_STORAGE_BIT);
 
@@ -362,7 +318,7 @@ namespace ssao
     { // Scene Geometry
       geometry::Mesh<Vertex>  scene;
       const int LEVELS = 4;
-      
+
       sceneObjects = 0;
       for (int i = 0; i < grid * grid; i++){
 
@@ -371,7 +327,7 @@ namespace ssao
         color += 0.75f;
 
         vec2  posxy(i % grid, i / grid);
-        
+
         float depth = sin(posxy.x*0.1f) * cos(posxy.y*0.1f) * 2.0f;
 
 
@@ -385,9 +341,9 @@ namespace ssao
           }
 
           vec3 size = vec3(scale);
-          
 
-          size.z *= frand()*1.0f+1.0f; 
+
+          size.z *= frand()*1.0f+1.0f;
           if (l != 0){
             size.z *= powf(0.7f,float(l));
           }
@@ -444,30 +400,15 @@ namespace ssao
 
   bool Sample::initFramebuffers(int width, int height, int samples)
   {
+    newTexture(textures.scene_color);
+    glBindTexture (GL_TEXTURE_2D, textures.scene_color);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
+    glBindTexture (GL_TEXTURE_2D, 0);
 
-    if (samples > 1){
-      newTexture(textures.scene_color);
-      glBindTexture (GL_TEXTURE_2D_MULTISAMPLE, textures.scene_color);
-      glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGBA8, width, height, GL_FALSE);
-      glBindTexture (GL_TEXTURE_2D_MULTISAMPLE, 0);
-
-      newTexture(textures.scene_depthstencil);
-      glBindTexture (GL_TEXTURE_2D_MULTISAMPLE, textures.scene_depthstencil);
-      glTexStorage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_DEPTH24_STENCIL8, width, height, GL_FALSE);
-      glBindTexture (GL_TEXTURE_2D_MULTISAMPLE, 0);
-    }
-    else
-    {
-      newTexture(textures.scene_color);
-      glBindTexture (GL_TEXTURE_2D, textures.scene_color);
-      glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, width, height);
-      glBindTexture (GL_TEXTURE_2D, 0);
-
-      newTexture(textures.scene_depthstencil);
-      glBindTexture (GL_TEXTURE_2D, textures.scene_depthstencil);
-      glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, width, height);
-      glBindTexture (GL_TEXTURE_2D, 0);
-    }
+    newTexture(textures.scene_depthstencil);
+    glBindTexture (GL_TEXTURE_2D, textures.scene_depthstencil);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, width, height);
+    glBindTexture (GL_TEXTURE_2D, 0);
 
     newFramebuffer(fbos.scene);
     glBindFramebuffer(GL_FRAMEBUFFER,     fbos.scene);
@@ -506,14 +447,9 @@ namespace ssao
 
     // hbao
 
-#if USE_AO_SPECIALBLUR
     GLenum formatAO = GL_RG16F;
     GLint swizzle[4] = {GL_RED,GL_GREEN,GL_ZERO,GL_ZERO};
-#else
-    GLenum formatAO = GL_R8;
-    GLint swizzle[4] = {GL_RED,GL_RED,GL_RED,GL_RED};
-#endif
-    
+
     newTexture(textures.hbao_result);
     glBindTexture (GL_TEXTURE_2D, textures.hbao_result);
     glTexStorage2D(GL_TEXTURE_2D, 1, formatAO, width, height);
@@ -613,33 +549,15 @@ namespace ssao
     TwDefine(" mainbar position='0 0' size='300 150' color='0 0 0' alpha=128 valueswidth=120 ");
     TwDefine((std::string(" mainbar label='") + PROJECT_NAME + "'").c_str());
 
-    TwEnumVal enumVals[] = {
-      {ALGORITHM_NONE,"none"},
-      {ALGORITHM_HBAO_CACHEAWARE,"hbao cache-aware"},
-      {ALGORITHM_HBAO_CLASSIC,"hbao classic"},
-    };
-    TwType algorithmType = TwDefineEnum("algorithm", enumVals, sizeof(enumVals)/sizeof(enumVals[0]));
-
-    TwEnumVal enumSampleVals[] = {
-      {1,"none"},
-      {2,"2x"},
-      {4,"4x"},
-      {8,"8x"},
-    };
-    TwType samplesType = TwDefineEnum("samples", enumSampleVals, sizeof(enumSampleVals)/sizeof(enumSampleVals[0]));
-
-    TwAddVarRW(bar, "samples",  samplesType, &tweak.samples, " label='msaa' ");
-    TwAddVarRW(bar, "algorithm",  algorithmType, &tweak.algorithm, " label='ssao algorithm' ");
     TwAddVarRW(bar, "radius",  TW_TYPE_FLOAT, &tweak.radius, " label='radius' step=0.1 min=0 precision=2 ");
     TwAddVarRW(bar, "intensity",  TW_TYPE_FLOAT, &tweak.intensity, " label='intensity' min=0 step=0.1 ");
     TwAddVarRW(bar, "bias",  TW_TYPE_FLOAT, &tweak.bias, " label='bias' min=0 step=0.1 max=0.1");
-    TwAddVarRW(bar, "bluractive",  TW_TYPE_BOOL32, &tweak.blur, " label='blur active' ");
     TwAddVarRW(bar, "blursharpness",  TW_TYPE_FLOAT, &tweak.blurSharpness, " label='blur sharpness' min=0 ");
 
     m_control.m_sceneOrbit = vec3(0.0f);
     m_control.m_sceneDimension = float(globalscale);
     m_control.m_viewMatrix = nv_math::look_at(m_control.m_sceneOrbit - (vec3(0.4f,-0.35f,-0.6f)*m_control.m_sceneDimension*0.5f), m_control.m_sceneOrbit, vec3(0,1,0));
-    
+
     return validated;
   }
 
@@ -699,23 +617,12 @@ namespace ssao
     NV_PROFILE_SECTION("linearize");
     glBindFramebuffer(GL_FRAMEBUFFER, fbos.depthlinear);
 
-    if (tweak.samples > 1){
-      glUseProgram(progManager.get(programs.depth_linearize_msaa));
-      glUniform4f(0,projection.nearplane * projection.farplane, projection.nearplane-projection.farplane, projection.farplane, 1.0f);
-      glUniform1i(1,sampleIdx);
+    glUseProgram(progManager.get(programs.depth_linearize));
+    glUniform4f(0,projection.nearplane * projection.farplane, projection.nearplane-projection.farplane, projection.farplane, 1.0f);
 
-      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_MULTISAMPLE, textures.scene_depthstencil);
-      glDrawArrays(GL_TRIANGLES,0,3);
-      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_MULTISAMPLE, 0);
-    }
-    else{
-      glUseProgram(progManager.get(programs.depth_linearize));
-      glUniform4f(0,projection.nearplane * projection.farplane, projection.nearplane-projection.farplane, projection.farplane, 1.0f);
-
-      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, textures.scene_depthstencil);
-      glDrawArrays(GL_TRIANGLES,0,3);
-      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, 0);
-    }
+    glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, textures.scene_depthstencil);
+    glDrawArrays(GL_TRIANGLES,0,3);
+    glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, 0);
   }
 
   void Sample::drawHbaoBlur(const Projection& projection, int width, int height, int sampleIdx)
@@ -724,7 +631,7 @@ namespace ssao
 
     float meters2viewspace = 1.0f;
 
-    glUseProgram(progManager.get(USE_AO_SPECIALBLUR ? programs.hbao_blur : programs.bilateralblur));
+    glUseProgram(progManager.get(programs.hbao_blur));
     glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.scene_depthlinear);
 
     glUniform1f(0,tweak.blurSharpness/meters2viewspace);
@@ -740,69 +647,13 @@ namespace ssao
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ZERO,GL_SRC_COLOR);
-    if (tweak.samples > 1){
-      glEnable(GL_SAMPLE_MASK);
-      glSampleMaski(0, 1<<sampleIdx);
-    }
 
-#if USE_AO_SPECIALBLUR
     glUseProgram(progManager.get(programs.hbao_blur2));
     glUniform1f(0,tweak.blurSharpness/meters2viewspace);
-#endif
 
     glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, textures.hbao_blur);
     glUniform2f(1,0,1.0f/float(height));
     glDrawArrays(GL_TRIANGLES,0,3);
-  }
-
-
-  void Sample::drawHbaoClassic(const Projection& projection, int width, int height, int sampleIdx)
-  {
-    prepareHbaoData(projection,width,height);
-
-    drawLinearDepth(projection,width,height,sampleIdx);
-
-    {
-      NV_PROFILE_SECTION("ssaocalc");
-
-      if (tweak.blur){
-        glBindFramebuffer(GL_FRAMEBUFFER, fbos.hbao_calc);
-        glDrawBuffer(GL_COLOR_ATTACHMENT0);
-      }
-      else{
-        glBindFramebuffer(GL_FRAMEBUFFER, fbos.scene);
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ZERO,GL_SRC_COLOR);
-        if (tweak.samples > 1){
-          glEnable(GL_SAMPLE_MASK);
-          glSampleMaski(0, 1<<sampleIdx);
-        }
-      }
-
-      glUseProgram(progManager.get( USE_AO_SPECIALBLUR && tweak.blur ? programs.hbao_calc_blur : programs.hbao_calc ));
-
-      glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers.hbao_ubo);
-      glNamedBufferSubDataEXT(buffers.hbao_ubo,0,sizeof(HBAOData),&hbaoUbo);
-
-      glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, textures.scene_depthlinear);
-      glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.hbao_randomview[sampleIdx]);
-      glDrawArrays(GL_TRIANGLES,0,3);
-    }
-
-    if (tweak.blur){
-      drawHbaoBlur(projection,width,height,sampleIdx);
-    }
-
-    glEnable(GL_DEPTH_TEST);
-    glDisable(GL_BLEND);
-    glDisable(GL_SAMPLE_MASK);
-    glSampleMaski(0, ~0);
-
-    glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D, 0);
-    glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, 0);
-
-    glUseProgram(0);
   }
 
   void Sample::drawHbaoCacheAware(const Projection& projection, int width, int height, int sampleIdx)
@@ -841,19 +692,20 @@ namespace ssao
         glUniform4f(0, float(i % 4) + 0.5f, float(i / 4) + 0.5f, hbaoUbo.InvFullResolution.x, hbaoUbo.InvFullResolution.y);
 
         for (int layer = 0; layer < NUM_MRT; layer++){
-          glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_depthview[i+layer], 0);
+          //glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_depthview[i+layer], 0);
+            glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, textures.hbao2_deptharray, 0, i + layer);
         }
         glDrawArrays(GL_TRIANGLES,0,3);
       }
     }
-    
+
     {
       NV_PROFILE_SECTION("ssaocalc");
 
       glBindFramebuffer(GL_FRAMEBUFFER, fbos.hbao2_calc);
       glViewport(0,0,quarterWidth,quarterHeight);
 
-      glUseProgram(progManager.get(USE_AO_SPECIALBLUR && tweak.blur ? programs.hbao2_calc_blur : programs.hbao2_calc));
+      glUseProgram(progManager.get(programs.hbao2_calc_blur));
       glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.scene_viewnormal);
 
       glBindBufferBase(GL_UNIFORM_BUFFER,0,buffers.hbao_ubo);
@@ -873,32 +725,18 @@ namespace ssao
     {
       NV_PROFILE_SECTION("reinterleave");
 
-      if (tweak.blur){
-        glBindFramebuffer(GL_FRAMEBUFFER, fbos.hbao_calc);
-        glDrawBuffer(GL_COLOR_ATTACHMENT0);
-      }
-      else{
-        glBindFramebuffer(GL_FRAMEBUFFER, fbos.scene);
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ZERO,GL_SRC_COLOR);
-        if (tweak.samples > 1){
-          glEnable(GL_SAMPLE_MASK);
-          glSampleMaski(0, 1<<sampleIdx);
-        }
-      }
+      glBindFramebuffer(GL_FRAMEBUFFER, fbos.hbao_calc);
+      glDrawBuffer(GL_COLOR_ATTACHMENT0);
       glViewport(0,0,width,height);
 
-      glUseProgram(progManager.get(USE_AO_SPECIALBLUR && tweak.blur ? programs.hbao2_reinterleave_blur : programs.hbao2_reinterleave));
+      glUseProgram(progManager.get(programs.hbao2_reinterleave_blur));
 
       glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_ARRAY, textures.hbao2_resultarray);
       glDrawArrays(GL_TRIANGLES,0,3);
       glBindMultiTextureEXT(GL_TEXTURE0, GL_TEXTURE_2D_ARRAY, 0);
     }
 
-    if (tweak.blur){
-      drawHbaoBlur(projection,width,height,sampleIdx);
-    }
+    drawHbaoBlur(projection,width,height,sampleIdx);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -953,7 +791,7 @@ namespace ssao
       glEnable(GL_DEPTH_TEST);
 
       sceneUbo.viewport = uvec2(width,height);
-     
+
       nv_math::mat4 view = m_control.m_viewMatrix;
 
       sceneUbo.viewProjMatrix = projection.matrix * view;
@@ -985,17 +823,7 @@ namespace ssao
     {
       NV_PROFILE_SECTION("ssao");
 
-      for (int sample = 0; sample < tweak.samples; sample++)
-      {
-        switch(tweak.algorithm){
-        case ALGORITHM_HBAO_CLASSIC:
-          drawHbaoClassic(projection, width, height, sample);
-          break;
-        case ALGORITHM_HBAO_CACHEAWARE:
-          drawHbaoCacheAware(projection, width, height, sample);
-          break;
-        }
-      }
+      drawHbaoCacheAware(projection, width, height, 0);
     }
 
     {
@@ -1007,7 +835,7 @@ namespace ssao
         0,0,width,height,GL_COLOR_BUFFER_BIT, GL_NEAREST);
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
-    
+
     {
       NV_PROFILE_SECTION("TwDraw");
       TwDraw();
