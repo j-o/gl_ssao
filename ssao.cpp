@@ -284,8 +284,6 @@ namespace ssao
 
     rng.seed((unsigned)0);
 
-    signed short f[HBAO_RANDOM_ELEMENTS*4];
-
     for(int i=0; i<HBAO_RANDOM_ELEMENTS; i++)
     {
       float Rand1 = rng.randExc();
@@ -297,12 +295,6 @@ namespace ssao
       hbaoRandom[i].y = sinf(Angle);
       hbaoRandom[i].z = Rand2;
       hbaoRandom[i].w = 0;
-#define SCALE ((1<<15))
-      f[i*4+0] = (signed short)(SCALE*hbaoRandom[i].x);
-      f[i*4+1] = (signed short)(SCALE*hbaoRandom[i].y);
-      f[i*4+2] = (signed short)(SCALE*hbaoRandom[i].z);
-      f[i*4+3] = (signed short)(SCALE*hbaoRandom[i].w);
-#undef SCALE
     }
 
     return true;
@@ -551,17 +543,17 @@ namespace ssao
     const float* P = projection.matrix.get_value();
 
     float projInfoPerspective[] = {
-      2.0f / (P[4*0+0]),       // (x) * (R - L)/N
-      2.0f / (P[4*1+1]),       // (y) * (T - B)/N
-      -( 1.0f - P[4*2+0]) / P[4*0+0], // L/N
-      -( 1.0f + P[4*2+1]) / P[4*1+1], // B/N
+      2.0f / (P[4*0+0]),       // (x) * (R - L)/N            // (r - l) / n
+      2.0f / (P[4*1+1]),       // (y) * (T - B)/N            // (t - b) / n
+      -( 1.0f - P[4*2+0]) / P[4*0+0], // L/N                 // l / n
+      -( 1.0f + P[4*2+1]) / P[4*1+1], // B/N                 // b / n
     };
 
     float projInfoOrtho[] = {
-      2.0f / ( P[4*0+0]),      // ((x)  * R - L)
-      2.0f / ( P[4*1+1]),      // ((y) * T - B)
-      -( 1.0f + P[4*3+0]) / P[4*0+0], // L
-      -( 1.0f - P[4*3+1]) / P[4*1+1], // B
+      2.0f / ( P[4*0+0]),      // ((x)  * R - L)             // r - l
+      2.0f / ( P[4*1+1]),      // ((y) * T - B)              // t - b
+      -( 1.0f + P[4*3+0]) / P[4*0+0], // L                   // l
+      -( 1.0f - P[4*3+1]) / P[4*1+1], // B                   // b
     };
 
     int useOrtho = 0;
@@ -616,7 +608,6 @@ namespace ssao
     float meters2viewspace = 1.0f;
 
     glUseProgram(progManager.get(programs.hbao_blur));
-    glBindMultiTextureEXT(GL_TEXTURE1, GL_TEXTURE_2D, textures.scene_depthlinear);
 
     glUniform1f(0,tweak.blurSharpness/meters2viewspace);
 
@@ -701,8 +692,7 @@ namespace ssao
       glUniform1f(9, hbaoUbo.AOMultiplier);
       glUniform1f(10, hbaoUbo.PowExponent);
       glUniform4fv(11, 1, hbaoUbo.projInfo.get_value());
-      glUniform2fv(12, 1, hbaoUbo.projScale.get_value());
-      glUniform1i(13, hbaoUbo.projOrtho);
+      glUniform1i(12, hbaoUbo.projOrtho);
 
       for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++){
         glUniform2f(0, float(i % 4) + 0.5f, float(i / 4) + 0.5f);
